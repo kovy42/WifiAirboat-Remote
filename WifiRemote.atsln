@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Atmel Studio Solution File, Format Version 11.00
-Project("{54F91283-7BC4-4236-8FF9-10F437C3AD48}") = "WifiRemote", "WifiRemote\WifiRemote.cproj", "{90ED26F0-D46C-4155-B276-131C543FDA12}"
+Project("{54F91283-7BC4-4236-8FF9-10F437C3AD48}") = "WifiRemote", "WifiRemote\WifiRemote.cproj", "{A29757CF-2C0B-496C-8FF7-E83C4147B22A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,10 +9,10 @@ Global
 		Release|AVR = Release|AVR
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{90ED26F0-D46C-4155-B276-131C543FDA12}.Debug|AVR.ActiveCfg = Debug|AVR
-		{90ED26F0-D46C-4155-B276-131C543FDA12}.Debug|AVR.Build.0 = Debug|AVR
-		{90ED26F0-D46C-4155-B276-131C543FDA12}.Release|AVR.ActiveCfg = Release|AVR
-		{90ED26F0-D46C-4155-B276-131C543FDA12}.Release|AVR.Build.0 = Release|AVR
+		{A29757CF-2C0B-496C-8FF7-E83C4147B22A}.Debug|AVR.ActiveCfg = Debug|AVR
+		{A29757CF-2C0B-496C-8FF7-E83C4147B22A}.Debug|AVR.Build.0 = Debug|AVR
+		{A29757CF-2C0B-496C-8FF7-E83C4147B22A}.Release|AVR.ActiveCfg = Release|AVR
+		{A29757CF-2C0B-496C-8FF7-E83C4147B22A}.Release|AVR.Build.0 = Release|AVR
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
