@@ -1,4 +1,9 @@
-
+/*
+ * AirBoat.c
+ *
+ * Created: 2018-03-20 15:26:52
+ *  Author: Equipe 24
+ */ 
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -9,138 +14,210 @@
 #include "fifo.h"
 #include "lcd.h"
 
+#define WAIT_DATA 0 // Attente d'une transmission
+#define WAIT_OPEN_BRACKET 1 // Début de la transmission
+#define READ_DATA 2 // Lecture de la transmission
+#define DISPLAY_DATA 3 // Affichage
+
+bool isOnBoard;
+uint8_t getMaxBatteryValue(uint8_t);
+uint8_t getBatteryUsagePercentage(uint8_t,uint8_t,uint8_t);
+uint8_t getRealBatteryTension(uint8_t,uint8_t);
+void DelBattery(uint8_t);
+
+
+/* ==================== REMOTE VARIABLES ===================== */
+uint8_t mHorizontale;
+uint8_t mVerticale;
+uint8_t mLiftMemory;
+uint8_t mBatterie;
+bool mButtonState;
+bool mFlyMode;
+char mOutputText[16];
+bool mOldFlyState;
+void initializeRemote();
+char* aText;
+
+
 int main(void)
 {
+	/* ================== INITIALISATION GLOBALE ================== */
 	lcd_init();
 	adc_init();
-	//pwm_init(1,1);
-	//uint8_t valeurMoteur;
-	//servo_init();
-	//uint8_t valeurServo;
-	
+	pwm_init(1,1);
 	uart_init();
+	uart_clean_rx_buffer();
+	servo_init();
+	
 	SREG = set_bit(SREG, 7);
 	uart_set_baudrate(BAUDRATE_9600);
+	DDRD = clear_bit(DDRD,PD6);
 	
-	//slide
-
+	initializeRemote();
+	//Lecture de la tension de la batterie
+	
+	
+	while(1){
+		
+		mButtonState = read_bit(PIND, PD3);
+		if(mButtonState != mOldFlyState && mButtonState == 0)
+		{
+			mFlyMode = !mFlyMode;
+			mOldFlyState = 0;
+		}
+		else
+		
+		mOldFlyState = 1;
+		// Conversion de la direction pour limiter à 45 degrés, et ajustement de 2/255 vers la droite car le servomoteur est décalibré (props à David).
+		mHorizontale = (adc_read(PA1) / 2) + 65;
+		mVerticale = adc_read(PA2);
+		mVerticale = (255 - mVerticale);
+		if(mVerticale == 0){
+			mVerticale++;
+		}
+		
+		mBatterie = adc_read(PA3);
+		if(mFlyMode)
+		mLiftMemory = mVerticale;
+		if(!mFlyMode && mLiftMemory < 128)
+		mVerticale = mVerticale;
+		lcd_clear_display();
+		
+		if(uart_is_tx_buffer_empty())
+		{
+			mOutputText[0] = '[';
+			uint8_to_string(mOutputText + 1,mHorizontale);
+			uint8_to_string(mOutputText + 4, mVerticale);
+			if(mFlyMode){
+				mOutputText[7] = 'L';
+			}
+			else{
+				mOutputText[7] = 'S';
+			}
+			
+			
+			mOutputText[8] = ']';
+			mOutputText[9] = '\0';
+			
+			
+			uart_put_string(mOutputText);
+			char output[3];
+			uint8_to_string(output,getRealBatteryTension(mBatterie,9));
+			//DelBattery(getRealBatteryTension(mBatterie,9));
+			
+			lcd_write_string(mOutputText);
+			lcd_write_string(" M:");
+			lcd_write_string(output);
+			lcd_write_string("%");
+			
+			/*lcd_set_cursor_position(0,1);
+			lcd_write_string(uart_get_byte());*/
+			_delay_ms(100);
+			
+			
+			
+		}
+	}
 		
 	
-	uint8_t horizontale = 0;
-	uint8_t verticale = 0;	
-	uint8_t lift_memory = 0;
-	bool button_state = 0;
-	bool mode = 0;
+	
+	
+	
+}
+	
+/* ================= MÉTHODES POUR LA MANETTE ================== */	
+
+/************************************************************************/
+/* Initialiser la télécommande                                          */
+/************************************************************************/
+void initializeRemote(){
+	mHorizontale = 0;
+	mVerticale = 0;
+	mLiftMemory = 0;
+	mButtonState = 0;
+	mFlyMode = 0;
+	mOutputText[16] = NULL;
+	mBatterie = 0;
+		
+	DDRB = set_bit(DDRB,PB0);
+	DDRB = set_bit(DDRB,PB1);
+	DDRB = set_bit(DDRB,PB2);
+	DDRB = set_bit(DDRB,PB3);
+	DDRB = set_bit(DDRB,PB4);
 	DDRD = clear_bit(DDRD, PD3);
 	PORTD = set_bit(PORTD, PD3);
-	
-	
-	
+	mOldFlyState = read_bit(PIND, PD3);
 	
 	lcd_write_string("connecting....");
+	
 	OSCCAL = OSCCAL +4;
 	DDRD = set_bit(DDRD, PD2);
-	PORTD = clear_bit(PORTD,PD2);	
+	PORTD = clear_bit(PORTD,PD2);
 	_delay_ms(500);
 	PORTD = set_bit(PORTD,PD2);
-	_delay_ms(5000);
+	_delay_ms(1000);
 	
 	uart_put_string("AT+CIPMODE=1\r\n\0");
-	_delay_ms(250);
+	_delay_ms(2500);
+	//uart_get_string(aText,32);
+	//lcd_write_string(aText);
+	
+	
 	uart_put_string("AT+CIPSTART=\"UDP\",\"192.168.4.1\",456,123\r\n\0");
-	_delay_ms(250);	
+	_delay_ms(5000);
+	
+	
 	uart_put_string("AT+CIPSEND\r\n\0");
-	 lcd_clear_display();
+	lcd_clear_display();
 	lcd_write_string("connect :)");
-	_delay_ms(500);	
-	
-	char text[16] = "";
-	
-	bool old_state = read_bit(PIND, PD3);
-	
-    while(1)
-    {
-		
-		button_state = read_bit(PIND, PD3);
-		if(button_state != old_state && button_state == 0)
-		{
-			mode = !mode;
-			old_state = 0;						
-		}
-		else
-		old_state = 1;
-		
-		/*
-		
-		if(button_state == 0 && _done == 0)
-		{
-			compteur++;
-			_done = 1;
-		}
-		if(button_state == 1)
-		{
-			_done = 0;
-		}*/
-		
-		horizontale = adc_read(PA1);				
-		verticale = adc_read(PA2);		
-		verticale = (255 - verticale);
-		
-		if(mode)
-		lift_memory = verticale;
-		
-		if(!mode && lift_memory < 128)
-		verticale = 0;				
-				
-				
-		 lcd_clear_display();
-		if(uart_is_tx_buffer_empty())
-		{		
-			text[0] = '[';	
-			uint8_to_string(text + 1,horizontale);
-			uint8_to_string(text + 4, verticale);
-			if(mode)
-			text[7] = 'A';
-			else
-			text[7] = 'B';
-			
-			text[8] = ']';
-	        text[9] = '\0';
-			
-			
-		uart_put_string(text);
-		lcd_write_string(text);
-		if(mode)
-		lcd_write_string(" LIFT");
-		else
-		lcd_write_string(" SPEED");
-		
-		if(lift_memory < 128 && !mode)
-		{
-			lcd_set_cursor_position(0,1);
-			lcd_write_string(" LIFT TO LOW");
-		}
-		
-		
-		_delay_ms(100);
-		}
-		/*		
-       
-		if(adc_read(PA0)< 128){
-			valeurMoteur = 0;
-		}else{
-			valeurMoteur =(adc_read(PA0) - 128) * 2;	
-		}
-		valeurServo = adc_read(PA1);
-		uint8_to_string(text,valeurMoteur); 
-		pwm_set_a(valeurMoteur);
-		pwm_set_b(valeurMoteur);
-		servo_set_a(valeurServo);
-		
-		lcd_write_string(text);
-		_delay_ms(100);
-		*/
-		
-		
-    }
+	_delay_ms(500);
+}	
+
+/* ================== MÉTHODES POUR L'AÉROGLISSEUR ================== */
+
+
+
+
+/**************************************************************************/
+/* Returns the maximum value between 0 and 255 that the battery can output*/
+/**************************************************************************/
+uint8_t getMaxBatteryValue(uint8_t maxTension){
+	return  maxTension * 0.232558f / 3.3f * 255;
 }
+
+/************************************************************************/
+/* Returns the battery tension                                          */
+/************************************************************************/
+uint8_t getBatteryUsagePercentage(uint8_t adcValue, uint8_t maxTension, uint8_t minTension){
+	return (int)((((float)adcValue / (float)getMaxBatteryValue(maxTension) - ((float)minTension/(float)maxTension)) *100) /(100-(100*minTension/maxTension)) * 100) ;
+}
+
+uint8_t getRealBatteryTension(uint8_t adcValue, uint8_t maxTension){
+	return  (int)((float)adcValue * 10 / (float)getMaxBatteryValue(maxTension) * maxTension ) ; // Pour plus de précision, il affiche la valeur fois 100
+}
+
+void DelBattery(uint8_t battValue)
+{
+	if(battValue <= 100 && battValue > 80){
+		PORTB = 0b00011111;	
+	}
+	
+	
+	if(battValue <= 80 && battValue > 60){
+		PORTB = 0b00011111;
+	}
+	
+	if(battValue <= 60 && battValue > 40){
+		PORTB = 0b00011111;
+	}
+	
+	if(battValue <= 40 && battValue > 20){
+		PORTB = 0b00011111;
+	}
+	
+	if(battValue <= 20 && battValue >= 0){
+		PORTB = 0b00011111;	
+	}
+	
+}
+

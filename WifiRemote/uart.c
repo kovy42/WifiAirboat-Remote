@@ -87,6 +87,9 @@ static void disable_UDRE_interupt(void);
 static void enable_RX_interupt(void);
 static void disable_RX_interupt(void);
 
+static void enable_TX_interupt(void);
+static void disable_TX_interupt(void);
+
 
 /******************************************************************************
 Interupts
@@ -219,6 +222,19 @@ uint8_t uart_get_byte(void){
     return byte;
 }
 
+uint8_t uart_get_byte_tx(void){
+
+	uint8_t byte;
+
+	disable_TX_interupt();
+
+	byte = fifo_pop(&tx_fifo);
+
+	enable_TX_interupt();
+
+	return byte;
+}
+
 
 void uart_get_string(char* out_buffer, uint8_t buffer_length){
 	
@@ -297,3 +313,15 @@ static void disable_RX_interupt(void){
 
     UCSRB = clear_bit(UCSRB, RXCIE);
 }
+
+static void enable_TX_interupt(void){
+
+	UCSRB = set_bit(UCSRB, TXCIE);
+}
+
+static void disable_TX_interupt(void){
+
+	UCSRB = clear_bit(UCSRB, TXCIE);
+}
+
+

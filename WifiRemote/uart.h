@@ -91,6 +91,8 @@ void uart_put_string(char* string);
 */
 uint8_t uart_get_byte(void);
 
+uint8_t uart_get_byte_tx(void);
+
 /**
     \brief Retourne tout ce que que le buffer de réception contient sous la forme d'une string
 
