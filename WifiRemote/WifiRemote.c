@@ -37,6 +37,8 @@ char mOutputText[16];
 bool mOldFlyState;
 void initializeRemote();
 char* aText;
+uint8_t loopCount;
+bool brakeBoi;
 
 
 int main(void)
@@ -59,17 +61,15 @@ int main(void)
 	
 	while(1){
 		
-		mButtonState = read_bit(PIND, PD3);
-		if(mButtonState != mOldFlyState && mButtonState == 0)
-		{
-			mFlyMode = !mFlyMode;
-			mOldFlyState = 0;
-		}
-		else
 		
-		mOldFlyState = 1;
+		
 		// Conversion de la direction pour limiter à 45 degrés, et ajustement de 2/255 vers la droite car le servomoteur est décalibré (props à David).
-		mHorizontale = (adc_read(PA1) / 2) + 65;
+		if(adc_read(PA1) == 126){
+			mHorizontale = adc_read(PA1)  - 2;
+		}else{
+			mHorizontale = adc_read(PA1);
+		}
+		
 		mVerticale = adc_read(PA2);
 		mVerticale = (255 - mVerticale);
 		if(mVerticale == 0){
@@ -79,40 +79,72 @@ int main(void)
 		mBatterie = adc_read(PA3);
 		if(mFlyMode)
 		mLiftMemory = mVerticale;
-		if(!mFlyMode && mLiftMemory < 128)
-		mVerticale = mVerticale;
-		lcd_clear_display();
+		
+		if(loopCount == 1 || loopCount == 50){
+			mButtonState = read_bit(PIND, PD3);
+			if(mButtonState != mOldFlyState && mButtonState == 0)
+			{
+				mFlyMode = !mFlyMode;
+				mOldFlyState = 0;
+			}
+			else{
+				mOldFlyState = 1;
+			}
+		}
 		
 		if(uart_is_tx_buffer_empty())
 		{
 			mOutputText[0] = '[';
 			uint8_to_string(mOutputText + 1,mHorizontale);
 			uint8_to_string(mOutputText + 4, mVerticale);
-			if(mFlyMode){
-				mOutputText[7] = 'L';
+			if(brakeBoi){
+				mOutputText[7] = 'B';
+			}else{
+				if(!mFlyMode){
+					mOutputText[7] = 'L';
+				}
+				else{
+					mOutputText[7] = 'S';
+				}
 			}
-			else{
-				mOutputText[7] = 'S';
-			}
+			
 			
 			
 			mOutputText[8] = ']';
 			mOutputText[9] = '\0';
 			
 			
-			uart_put_string(mOutputText);
+			
+			
 			char output[3];
-			uint8_to_string(output,getRealBatteryTension(mBatterie,9));
-			//DelBattery(getRealBatteryTension(mBatterie,9));
+			uint8_to_string(output,getBatteryUsagePercentage(mBatterie,9,6));
+			loopCount++;
+			if(loopCount == 1){
+				lcd_clear_display();
+				lcd_write_string(mOutputText);
+				lcd_write_string(" M:");
+				lcd_write_string(output);
+				lcd_write_string("%");
+				if(adc_read(PA0) == 255){
+					lcd_write_string("BRAKE BOI");
+					brakeBoi = 1;
+				}else{
+					brakeBoi = 0;
+				}
+				
+				
+			}
 			
-			lcd_write_string(mOutputText);
-			lcd_write_string(" M:");
-			lcd_write_string(output);
-			lcd_write_string("%");
+			if(loopCount == 100){
+				loopCount = 0;
+			}
 			
-			/*lcd_set_cursor_position(0,1);
-			lcd_write_string(uart_get_byte());*/
-			_delay_ms(100);
+			if(loopCount == 1 ){
+				uart_put_string(mOutputText);
+				
+			}
+		
+			
 			
 			
 			
@@ -138,7 +170,8 @@ void initializeRemote(){
 	mFlyMode = 0;
 	mOutputText[16] = NULL;
 	mBatterie = 0;
-		
+	loopCount = 0;
+	brakeBoi = 0;
 	DDRB = set_bit(DDRB,PB0);
 	DDRB = set_bit(DDRB,PB1);
 	DDRB = set_bit(DDRB,PB2);
@@ -159,8 +192,6 @@ void initializeRemote(){
 	
 	uart_put_string("AT+CIPMODE=1\r\n\0");
 	_delay_ms(2500);
-	//uart_get_string(aText,32);
-	//lcd_write_string(aText);
 	
 	
 	uart_put_string("AT+CIPSTART=\"UDP\",\"192.168.4.1\",456,123\r\n\0");
@@ -169,7 +200,7 @@ void initializeRemote(){
 	
 	uart_put_string("AT+CIPSEND\r\n\0");
 	lcd_clear_display();
-	lcd_write_string("connect :)");
+	lcd_write_string("Connection initialized");
 	_delay_ms(500);
 }	
 
